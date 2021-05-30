@@ -103,7 +103,7 @@ class CUHK03(ImageDataset):
             return
 
         import h5py
-        from scipy.misc import imsave
+        import imageio
         from scipy.io import loadmat
 
         mkdir_if_missing(self.imgs_detected_dir)
@@ -136,7 +136,7 @@ class CUHK03(ImageDataset):
                 )
                 img_path = osp.join(save_dir, img_name)
                 if not osp.isfile(img_path):
-                    imsave(img_path, img)
+                    imageio.imwrite(img_path, img)
                 img_paths.append(img_path)
             return img_paths
 
@@ -151,10 +151,8 @@ class CUHK03(ImageDataset):
                     img_paths = _process_images(
                         camp[pid, :], campid, pid, imgs_dir
                     )
-                    assert len(img_paths
-                               ) > 0, 'campid{}-pid{} has no images'.format(
-                                   campid, pid
-                               )
+                    assert len(img_paths) > 0, \
+                        'campid{}-pid{} has no images'.format(campid, pid)
                     meta_data.append((campid + 1, pid + 1, img_paths))
                 print(
                     '- done camera pair {} with {} identities'.format(

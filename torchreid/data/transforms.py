@@ -4,7 +4,9 @@ import random
 from collections import deque
 import torch
 from PIL import Image
-from torchvision.transforms import *
+from torchvision.transforms import (
+    Resize, Compose, ToTensor, Normalize, ColorJitter, RandomHorizontalFlip
+)
 
 
 class Random2DTranslation(object):
@@ -152,7 +154,7 @@ class RandomPatch(object):
     Reference:
         - Zhou et al. Omni-Scale Feature Learning for Person Re-Identification. ICCV, 2019.
         - Zhou et al. Learning Generalisable Omni-Scale Representations
-          for Person Re-Identification. arXiv preprint, 2019.
+          for Person Re-Identification. TPAMI, 2021.
     """
 
     def __init__(
@@ -279,8 +281,13 @@ def build_transforms(
         transform_tr += [RandomHorizontalFlip()]
 
     if 'random_crop' in transforms:
-        print('+ random crop (enlarge to {}x{} and ' \
-              'crop {}x{})'.format(int(round(height*1.125)), int(round(width*1.125)), height, width))
+        print(
+            '+ random crop (enlarge to {}x{} and '
+            'crop {}x{})'.format(
+                int(round(height * 1.125)), int(round(width * 1.125)), height,
+                width
+            )
+        )
         transform_tr += [Random2DTranslation(height, width)]
 
     if 'random_patch' in transforms:

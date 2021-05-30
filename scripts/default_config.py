@@ -23,10 +23,11 @@ def get_default_config():
     cfg.data.width = 128 # image width
     cfg.data.combineall = False # combine train, query and gallery for training
     cfg.data.transforms = ['random_flip'] # data augmentation
+    cfg.data.k_tfm = 1 # number of times to apply augmentation to an image independently
     cfg.data.norm_mean = [0.485, 0.456, 0.406] # default is imagenet mean
     cfg.data.norm_std = [0.229, 0.224, 0.225] # default is imagenet std
     cfg.data.save_dir = 'log' # path to save log
-    cfg.data.load_train_targets = False
+    cfg.data.load_train_targets = False # load training set from target dataset
 
     # specific datasets
     cfg.market1501 = CN()
@@ -38,8 +39,11 @@ def get_default_config():
 
     # sampler
     cfg.sampler = CN()
-    cfg.sampler.train_sampler = 'RandomSampler'
+    cfg.sampler.train_sampler = 'RandomSampler' # sampler for source train loader
+    cfg.sampler.train_sampler_t = 'RandomSampler' # sampler for target train loader
     cfg.sampler.num_instances = 4 # number of instances per identity for RandomIdentitySampler
+    cfg.sampler.num_cams = 1 # number of cameras to sample in a batch (for RandomDomainSampler)
+    cfg.sampler.num_datasets = 1 # number of datasets to sample in a batch (for RandomDatasetSampler)
 
     # video reid setting
     cfg.video = CN()
@@ -113,6 +117,7 @@ def imagedata_kwargs(cfg):
         'height': cfg.data.height,
         'width': cfg.data.width,
         'transforms': cfg.data.transforms,
+        'k_tfm': cfg.data.k_tfm,
         'norm_mean': cfg.data.norm_mean,
         'norm_std': cfg.data.norm_std,
         'use_gpu': cfg.use_gpu,
@@ -123,8 +128,11 @@ def imagedata_kwargs(cfg):
         'batch_size_test': cfg.test.batch_size,
         'workers': cfg.data.workers,
         'num_instances': cfg.sampler.num_instances,
+        'num_cams': cfg.sampler.num_cams,
+        'num_datasets': cfg.sampler.num_datasets,
         'train_sampler': cfg.sampler.train_sampler,
-        # image
+        'train_sampler_t': cfg.sampler.train_sampler_t,
+        # image dataset specific
         'cuhk03_labeled': cfg.cuhk03.labeled_images,
         'cuhk03_classic_split': cfg.cuhk03.classic_split,
         'market1501_500k': cfg.market1501.use_500k_distractors,
@@ -148,8 +156,10 @@ def videodata_kwargs(cfg):
         'batch_size_test': cfg.test.batch_size,
         'workers': cfg.data.workers,
         'num_instances': cfg.sampler.num_instances,
+        'num_cams': cfg.sampler.num_cams,
+        'num_datasets': cfg.sampler.num_datasets,
         'train_sampler': cfg.sampler.train_sampler,
-        # video
+        # video dataset specific
         'seq_len': cfg.video.seq_len,
         'sample_method': cfg.video.sample_method
     }

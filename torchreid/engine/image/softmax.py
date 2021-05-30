@@ -1,6 +1,4 @@
 from __future__ import division, print_function, absolute_import
-import time
-import datetime
 
 from torchreid import metrics
 from torchreid.losses import CrossEntropyLoss
@@ -78,15 +76,16 @@ class ImageSoftmaxEngine(Engine):
         )
 
     def forward_backward(self, data):
-        imgs, pids = self._parse_data_for_train(data)
+        imgs, pids = self.parse_data_for_train(data)
 
         if self.use_gpu:
             imgs = imgs.cuda()
             pids = pids.cuda()
 
-        self.optimizer.zero_grad()
         outputs = self.model(imgs)
-        loss = self._compute_loss(self.criterion, outputs, pids)
+        loss = self.compute_loss(self.criterion, outputs, pids)
+
+        self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
 

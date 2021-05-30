@@ -70,15 +70,16 @@ class DataManager(object):
         """Returns the number of training cameras."""
         return self._num_train_cams
 
-    def return_query_and_gallery_by_name(self, name):
+    def fetch_test_loaders(self, name):
         """Returns query and gallery of a test dataset, each containing
         tuples of (img_path(s), pid, camid).
 
         Args:
             name (str): dataset name.
         """
-        return self.test_dataset[name]['query'], self.test_dataset[name][
-            'gallery']
+        query_loader = self.test_dataset[name]['query']
+        gallery_loader = self.test_dataset[name]['gallery']
+        return query_loader, gallery_loader
 
     def preprocess_pil_img(self, img):
         """Transforms a PIL image to torch tensor for testing."""
@@ -97,6 +98,10 @@ class ImageDataManager(DataManager):
         width (int, optional): target image width. Default is 128.
         transforms (str or list of str, optional): transformations applied to model training.
             Default is 'random_flip'.
+        k_tfm (int): number of times to apply augmentation to an image
+            independently. If k_tfm > 1, the transform function will be
+            applied k_tfm times to an image. This variable will only be
+            useful for training and is currently valid for image datasets only.
         norm_mean (list or None, optional): data mean. Default is None (use imagenet mean).
         norm_std (list or None, optional): data std. Default is None (use imagenet std).
         use_gpu (bool, optional): use gpu. Default is True.
@@ -110,7 +115,12 @@ class ImageDataManager(DataManager):
         workers (int, optional): number of workers. Default is 4.
         num_instances (int, optional): number of instances per identity in a batch.
             Default is 4.
+        num_cams (int, optional): number of cameras to sample in a batch (when using
+            ``RandomDomainSampler``). Default is 1.
+        num_datasets (int, optional): number of datasets to sample in a batch (when
+            using ``RandomDatasetSampler``). Default is 1.
         train_sampler (str, optional): sampler. Default is RandomSampler.
+        train_sampler_t (str, optional): sampler for target train loader. Default is RandomSampler.
         cuhk03_labeled (bool, optional): use cuhk03 labeled images.
             Default is False (defaul is to use detected images).
         cuhk03_classic_split (bool, optional): use the classic split in cuhk03.
@@ -148,6 +158,7 @@ class ImageDataManager(DataManager):
         height=256,
         width=128,
         transforms='random_flip',
+        k_tfm=1,
         norm_mean=None,
         norm_std=None,
         use_gpu=True,
@@ -158,7 +169,10 @@ class ImageDataManager(DataManager):
         batch_size_test=32,
         workers=4,
         num_instances=4,
+        num_cams=1,
+        num_datasets=1,
         train_sampler='RandomSampler',
+        train_sampler_t='RandomSampler',
         cuhk03_labeled=False,
         cuhk03_classic_split=False,
         market1501_500k=False
@@ -181,6 +195,7 @@ class ImageDataManager(DataManager):
             trainset_ = init_image_dataset(
                 name,
                 transform=self.transform_tr,
+                k_tfm=k_tfm,
                 mode='train',
                 combineall=combineall,
                 root=root,
@@ -201,7 +216,9 @@ class ImageDataManager(DataManager):
                 trainset.train,
                 train_sampler,
                 batch_size=batch_size_train,
-                num_instances=num_instances
+                num_instances=num_instances,
+                num_cams=num_cams,
+                num_datasets=num_datasets
             ),
             batch_size=batch_size_train,
             shuffle=False,
@@ -222,6 +239,7 @@ class ImageDataManager(DataManager):
                 trainset_t_ = init_image_dataset(
                     name,
                     transform=self.transform_tr,
+                    k_tfm=k_tfm,
                     mode='train',
                     combineall=False, # only use the training data
                     root=root,
@@ -237,9 +255,11 @@ class ImageDataManager(DataManager):
                 trainset_t,
                 sampler=build_train_sampler(
                     trainset_t.train,
-                    train_sampler,
+                    train_sampler_t,
                     batch_size=batch_size_train,
-                    num_instances=num_instances
+                    num_instances=num_instances,
+                    num_cams=num_cams,
+                    num_datasets=num_datasets
                 ),
                 batch_size=batch_size_train,
                 shuffle=False,
@@ -350,6 +370,10 @@ class VideoDataManager(DataManager):
         workers (int, optional): number of workers. Default is 4.
         num_instances (int, optional): number of instances per identity in a batch.
             Default is 4.
+        num_cams (int, optional): number of cameras to sample in a batch (when using
+            ``RandomDomainSampler``). Default is 1.
+        num_datasets (int, optional): number of datasets to sample in a batch (when
+            using ``RandomDatasetSampler``). Default is 1.
         train_sampler (str, optional): sampler. Default is RandomSampler.
         seq_len (int, optional): how many images to sample in a tracklet. Default is 15.
         sample_method (str, optional): how to sample images in a tracklet. Default is "evenly".
@@ -401,6 +425,8 @@ class VideoDataManager(DataManager):
         batch_size_test=3,
         workers=4,
         num_instances=4,
+        num_cams=1,
+        num_datasets=1,
         train_sampler='RandomSampler',
         seq_len=15,
         sample_method='evenly'
@@ -440,7 +466,9 @@ class VideoDataManager(DataManager):
             trainset.train,
             train_sampler,
             batch_size=batch_size_train,
-            num_instances=num_instances
+            num_instances=num_instances,
+            num_cams=num_cams,
+            num_datasets=num_datasets
         )
 
         self.train_loader = torch.utils.data.DataLoader(

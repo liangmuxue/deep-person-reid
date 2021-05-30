@@ -22,9 +22,6 @@ class Engine(object):
     Args:
         datamanager (DataManager): an instance of ``torchreid.data.ImageDataManager``
             or ``torchreid.data.VideoDataManager``.
-        model (nn.Module): model instance.
-        optimizer (Optimizer): an Optimizer.
-        scheduler (LRScheduler, optional): if None, no learning rate decay will be performed.
         use_gpu (bool, optional): use gpu. Default is True.
     """
 
@@ -34,6 +31,7 @@ class Engine(object):
         self.test_loader = self.datamanager.test_loader
         self.use_gpu = (torch.cuda.is_available() and use_gpu)
         self.writer = None
+        self.epoch = 0
 
         self.model = None
         self.optimizer = None
@@ -103,7 +101,7 @@ class Engine(object):
     def get_current_lr(self, names=None):
         names = self.get_model_names(names)
         name = names[0]
-        return self._optims[name].param_groups[0]['lr']
+        return self._optims[name].param_groups[-1]['lr']
 
     def update_lr(self, names=None):
         names = self.get_model_names(names)
@@ -169,7 +167,6 @@ class Engine(object):
 
         if test_only:
             self.test(
-                0,
                 dist_metric=dist_metric,
                 normalize_feature=normalize_feature,
                 visrank=visrank,
@@ -201,7 +198,6 @@ class Engine(object):
                and (self.epoch+1) % eval_freq == 0 \
                and (self.epoch + 1) != self.max_epoch:
                 rank1 = self.test(
-                    self.epoch,
                     dist_metric=dist_metric,
                     normalize_feature=normalize_feature,
                     visrank=visrank,
@@ -211,12 +207,10 @@ class Engine(object):
                     ranks=ranks
                 )
                 self.save_model(self.epoch, rank1, save_dir)
-                self.writer.add_scalar('Test/rank1', rank1, self.epoch)
 
         if self.max_epoch > 0:
             print('=> Final test')
             rank1 = self.test(
-                self.epoch,
                 dist_metric=dist_metric,
                 normalize_feature=normalize_feature,
                 visrank=visrank,
@@ -226,7 +220,6 @@ class Engine(object):
                 ranks=ranks
             )
             self.save_model(self.epoch, rank1, save_dir)
-            self.writer.add_scalar('Test/rank1', rank1, self.epoch)
 
         elapsed = round(time.time() - time_start)
         elapsed = str(datetime.timedelta(seconds=elapsed))
@@ -241,7 +234,7 @@ class Engine(object):
 
         self.set_model_mode('train')
 
-        self._two_stepped_transfer_learning(
+        self.two_stepped_transfer_learning(
             self.epoch, fixbase_epoch, open_layers
         )
 
@@ -298,7 +291,6 @@ class Engine(object):
 
     def test(
         self,
-        epoch,
         dist_metric='euclidean',
         normalize_feature=False,
         visrank=False,
@@ -318,7 +310,7 @@ class Engine(object):
 
             The test pipeline implemented in this function suits both image- and
             video-reid. In general, a subclass of Engine only needs to re-implement
-            ``_extract_features()`` and ``_parse_data_for_eval()`` (most of the time),
+            ``extract_features()`` and ``parse_data_for_eval()`` (most of the time),
             but not a must. Please refer to the source code for more details.
         """
         self.set_model_mode('eval')
@@ -329,8 +321,7 @@ class Engine(object):
             print('##### Evaluating {} ({}) #####'.format(name, domain))
             query_loader = self.test_loader[name]['query']
             gallery_loader = self.test_loader[name]['gallery']
-            rank1 = self._evaluate(
-                epoch,
+            rank1, mAP = self._evaluate(
                 dataset_name=name,
                 query_loader=query_loader,
                 gallery_loader=gallery_loader,
@@ -344,12 +335,15 @@ class Engine(object):
                 rerank=rerank
             )
 
+            if self.writer is not None:
+                self.writer.add_scalar(f'Test/{name}/rank1', rank1, self.epoch)
+                self.writer.add_scalar(f'Test/{name}/mAP', mAP, self.epoch)
+
         return rank1
 
     @torch.no_grad()
     def _evaluate(
         self,
-        epoch,
         dataset_name='',
         query_loader=None,
         gallery_loader=None,
@@ -367,13 +361,13 @@ class Engine(object):
         def _feature_extraction(data_loader):
             f_, pids_, camids_ = [], [], []
             for batch_idx, data in enumerate(data_loader):
-                imgs, pids, camids = self._parse_data_for_eval(data)
+                imgs, pids, camids = self.parse_data_for_eval(data)
                 if self.use_gpu:
                     imgs = imgs.cuda()
                 end = time.time()
-                features = self._extract_features(imgs)
+                features = self.extract_features(imgs)
                 batch_time.update(time.time() - end)
-                features = features.data.cpu()
+                features = features.cpu().clone()
                 f_.append(features)
                 pids_.extend(pids)
                 camids_.extend(camids)
@@ -428,8 +422,7 @@ class Engine(object):
         if visrank:
             visualize_ranked_results(
                 distmat,
-                self.datamanager.
-                return_query_and_gallery_by_name(dataset_name),
+                self.datamanager.fetch_test_loaders(dataset_name),
                 self.datamanager.data_type,
                 width=self.datamanager.width,
                 height=self.datamanager.height,
@@ -437,30 +430,30 @@ class Engine(object):
                 topk=visrank_topk
             )
 
-        return cmc[0]
+        return cmc[0], mAP
 
-    def _compute_loss(self, criterion, outputs, targets):
+    def compute_loss(self, criterion, outputs, targets):
         if isinstance(outputs, (tuple, list)):
             loss = DeepSupervision(criterion, outputs, targets)
         else:
             loss = criterion(outputs, targets)
         return loss
 
-    def _extract_features(self, input):
+    def extract_features(self, input):
         return self.model(input)
 
-    def _parse_data_for_train(self, data):
-        imgs = data[0]
-        pids = data[1]
+    def parse_data_for_train(self, data):
+        imgs = data['img']
+        pids = data['pid']
         return imgs, pids
 
-    def _parse_data_for_eval(self, data):
-        imgs = data[0]
-        pids = data[1]
-        camids = data[2]
+    def parse_data_for_eval(self, data):
+        imgs = data['img']
+        pids = data['pid']
+        camids = data['camid']
         return imgs, pids, camids
 
-    def _two_stepped_transfer_learning(
+    def two_stepped_transfer_learning(
         self, epoch, fixbase_epoch, open_layers, model=None
     ):
         """Two-stepped transfer learning.

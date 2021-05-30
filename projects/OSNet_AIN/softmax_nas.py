@@ -1,11 +1,6 @@
 from __future__ import division, print_function, absolute_import
-import time
-import datetime
 
 from torchreid import metrics
-from torchreid.utils import (
-    AverageMeter, open_all_layers, open_specified_layers
-)
 from torchreid.engine import Engine
 from torchreid.losses import CrossEntropyLoss
 
@@ -47,7 +42,7 @@ class ImageSoftmaxNASEngine(Engine):
         )
 
     def forward_backward(self, data):
-        imgs, pids = self._parse_data_for_train(data)
+        imgs, pids = self.parse_data_for_train(data)
 
         if self.use_gpu:
             imgs = imgs.cuda()
@@ -58,14 +53,14 @@ class ImageSoftmaxNASEngine(Engine):
             lmda = self.init_lmda
         else:
             lmda = self.init_lmda * self.lmda_decay_rate**(
-                epoch // self.lmda_decay_step
+                self.epoch // self.lmda_decay_step
             )
             if lmda < self.min_lmda:
                 lmda = self.min_lmda
 
         for k in range(self.mc_iter):
             outputs = self.model(imgs, lmda=lmda)
-            loss = self._compute_loss(self.criterion, outputs, pids)
+            loss = self.compute_loss(self.criterion, outputs, pids)
             self.optimizer.zero_grad()
             loss.backward()
             self.optimizer.step()

@@ -71,16 +71,15 @@ class FeatureExtractor(object):
         model = build_model(
             model_name,
             num_classes=1,
-            pretrained=False,
+            pretrained=True,
             use_gpu=device.startswith('cuda')
         )
         model.eval()
 
-        num_params, flops = compute_model_complexity(
-            model, (1, 3, image_size[0], image_size[1])
-        )
-
         if verbose:
+            num_params, flops = compute_model_complexity(
+                model, (1, 3, image_size[0], image_size[1])
+            )
             print('Model: {}'.format(model_name))
             print('- params: {:,}'.format(num_params))
             print('- flops: {:,}'.format(flops))
@@ -114,7 +113,7 @@ class FeatureExtractor(object):
             for element in input:
                 if isinstance(element, str):
                     image = Image.open(element).convert('RGB')
-                    img = np.array(image)
+
                 elif isinstance(element, np.ndarray):
                     image = self.to_pil(element)
 
