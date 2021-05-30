@@ -131,7 +131,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--root', type=str)
     parser.add_argument('-d', '--dataset', type=str, default='market1501')
-    parser.add_argument('-m', '--model', type=str, default='osnet_x1_0')
+    parser.add_argument('-m', '--model', type=str, default='osnet_ain_x1_0')
     parser.add_argument('--weights', type=str)
     parser.add_argument('--save-dir', type=str, default='log')
     parser.add_argument('--height', type=int, default=256)
