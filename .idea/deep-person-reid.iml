@@ -3,6 +3,8 @@
   <component name="NewModuleRootManager">
     <content url="file://$MODULE_DIR$">
       <sourceFolder url="file://$MODULE_DIR$/scripts" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/projects/attribute_recognition" isTestSource="false" />
+      <excludeFolder url="file://$MODULE_DIR$/datasets" />
     </content>
     <orderEntry type="jdk" jdkName="Python 3.6 (torch-alp)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
